@@ -33,44 +33,32 @@ if (strpos($requestUri, '/assets/') !== false) {
     }
 }
 
-// 2. Jika ada file dist/index.html fisik, sajikan langsung
-if (file_exists(__DIR__ . '/dist/index.html')) {
-    header('Content-Type: text/html; charset=utf-8');
-    header('Cache-Control: no-cache, no-store, must-revalidate');
-    readfile(__DIR__ . '/dist/index.html');
-    exit;
-}
+// 2. Bundle JavaScript dan CSS produksi terbaru
+$jsFile = '/assets/index-BaCm_kwq.js';
+$cssFile = '/assets/index-DefqAUgF.css';
 
-// 3. Cari file bundle JavaScript dan CSS terbaru berdasarkan waktu modifikasi (filemtime)
-$jsFile = '';
-$cssFile = '';
-$latestJsTime = 0;
-$latestCssTime = 0;
-
+// Pencarian dinamis jika file bundle berganti
 $searchDirs = [__DIR__ . '/dist/assets', __DIR__ . '/assets'];
 foreach ($searchDirs as $dir) {
     if (is_dir($dir)) {
         $files = scandir($dir);
         foreach ($files as $file) {
-            $filePath = $dir . '/' . $file;
-            if (is_file($filePath)) {
-                $mtime = filemtime($filePath);
-                if (preg_match('/^index-.*\.js$/', $file) && $mtime > $latestJsTime) {
-                    $latestJsTime = $mtime;
-                    $jsFile = '/assets/' . $file;
-                }
-                if (preg_match('/^index-.*\.css$/', $file) && $mtime > $latestCssTime) {
-                    $latestCssTime = $mtime;
-                    $cssFile = '/assets/' . $file;
-                }
+            // Hindari file usang lama
+            if (preg_match('/^index-.*\.js$/', $file) && !in_array($file, ['index-B23_s9hh.js', 'index-BCcdkYMB.js', 'index-Brtf3PTx.js'])) {
+                $jsFile = '/assets/' . $file;
+            }
+            if (preg_match('/^index-.*\.css$/', $file)) {
+                $cssFile = '/assets/' . $file;
             }
         }
     }
 }
 
-// 4. Sajikan HTML Produksi Siap Pakai Langsung ke Browser!
+// 3. Sajikan HTML Produksi Siap Pakai Langsung ke Browser!
 header('Content-Type: text/html; charset=utf-8');
 header('Cache-Control: no-cache, no-store, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 ?>
 <!doctype html>
 <html lang="id">

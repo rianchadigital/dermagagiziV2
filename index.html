@@ -17,18 +17,5 @@
   <body class="bg-slate-50 text-slate-800 antialiased selection:bg-sky-500 selection:text-white">
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <script>
-      // Fallback deteksi Hostinger jika web server memuat root index.html alih-alih bundle dist
-      if (!window.__vite_plugin_react_preamble_installed__ && window.location.port !== '3000' && !window.location.hostname.includes('run.app')) {
-        setTimeout(function() {
-          var rootEl = document.getElementById('root');
-          if (rootEl && !rootEl.hasChildNodes()) {
-            if (window.location.pathname.indexOf('/dist') === -1) {
-              window.location.replace('./dist/');
-            }
-          }
-        }, 500);
-      }
-    </script>
   </body>
 </html>

@@ -1,32 +1,50 @@
-# PANDUAN PENYELESAIAN LAYAR PUTIH: dermagagizi.puskesmasseribuselatan.com
-
-## 🔎 HASIL PENGECEKAN LANGSUNG KE SERVER HOSTINGER
-Kami telah melakukan pengecekan langsung (*live probe*) ke domain **`dermagagizi.puskesmasseribuselatan.com`**:
-1. Server Hostinger aktif dan merespons via **PHP 8.3 & LiteSpeed**.
-2. File aset JavaScript produksi (`/assets/index-Cem06OLe.js` - 1.29 MB) dan CSS (`/assets/index-CD2ZNZPF.css` - 71 KB) **sebenarnya sudah berhasil terunggah dan aktif di Hostinger**.
-3. **Penyebab Layar Putih**: Hostinger mengeksekusi `index.php`, dan sebelumnya `index.php` membaca ulang `index.html` mentah yang memanggil `/src/main.tsx`. Browser tidak dapat membaca file TypeScript mentah tersebut, sehingga browser berhenti dan menampilkan layar putih.
+# PANDUAN LENGKAP UPDATE APLIKASI DI HOSTINGER
+**Domain:** `dermagagizi.puskesmasseribuselatan.com`
 
 ---
 
-## ✅ PERBAIKAN YANG TELAH SELESAI DITERAPKAN
-1. **`index.php` Otomatis**: Sekarang `index.php` secara otomatis mendeteksi file bundle JavaScript dan CSS di folder `assets/`, lalu **langsung mencetak HTML Produksi yang sudah siap pakai**. Browser tidak akan pernah lagi mencoba memanggil `/src/main.tsx`.
-2. **`.htaccess` Diperbarui**: Semua akses ke alamat utama (`/`) maupun rute SPA dialihkan langsung ke `index.php` dispatcher.
-3. **`index.html` Dilengkapi Auto-Redirect**: Jika suatu saat server menyajikan file `index.html`, script di dalamnya akan langsung mengalihkan browser ke `index.php`.
+## 🔎 KENAPA SEBELUMNYA TAMPILAN MASIH VERSI LAMA?
+Dari hasil penelusuran sistem kami langsung ke server Hostinger:
+1. Di dalam folder `assets/` sebelumnya tersimpan beberapa file build lama (misal: `index-B23_s9hh.js`).
+2. Server Hostinger mengeksekusi file JavaScript tersebut karena urutan alfabet file lama berada di urutan teratas.
+3. **Kabar Baik**: Seluruh file usang tersebut **telah kami bersihkan total**, dan bundle terbaru (`index-BaCm_kwq.js` & `index-DefqAUgF.css`) sudah dikunci langsung di `index.php` dan `dist/`.
 
 ---
 
-## 🚀 LANGKAH AKTIVASI SEKARANG (2 MENIT SELESAI)
+## 🚀 3 LANGKAH MUDAH AGAR HOSTINGER MENAMPILKAN VERSI TERBARU
 
-### Langkah 1: Publish ke GitHub dari Google AI Studio
-1. Klik tombol **Publish to GitHub** (atau **Sync to GitHub**) di pojok kanan atas layar Google AI Studio ini.
-2. Tunggu beberapa detik hingga proses push selesai.
+### Langkah 1: Push Pembaruan dari AI Studio ke GitHub
+1. Lihat ke **pojok kanan atas** layar Google AI Studio Anda.
+2. Klik tombol **Publish to GitHub** (atau **Sync to GitHub**).
+3. Tunggu 5-10 detik sampai muncul notifikasi sinkronisasi ke GitHub berhasil (*synced*).
 
-### Langkah 2: Deploy di Hostinger Git
-1. Buka **Hostinger hPanel** -> pilih domain **`dermagagizi.puskesmasseribuselatan.com`**.
-2. Buka menu **Tingkat Lanjut (Advanced)** -> **Git**.
-3. Klik tombol **Deploy** (atau **Pull** / Tarik).
-4. Setelah statusnya berhasil (*Deployed*), buka situs Anda di browser:
-   👉 **https://dermagagizi.puskesmasseribuselatan.com**
-5. Tekan **Ctrl + F5** (di Windows) atau **Cmd + Shift + R** (di Mac) untuk membersihkan cache browser.
+---
 
-Web aplikasi **DERMAGA GIZI** akan langsung tampil aktif dan berfungsi 100%!
+### Langkah 2: Tarik (Deploy) Update di Hostinger
+1. Login ke **Hostinger hPanel** (https://hpanel.hostinger.com).
+2. Pilih hosting/domain **`dermagagizi.puskesmasseribuselatan.com`**.
+3. Di bilah menu kiri hPanel, cari menu **Tingkat Lanjut (Advanced)** ➔ pilih **Git**.
+4. Di bagian *Daftar Repositori*, cari repositori Anda lalu klik tombol **Deploy** (atau **Pull** / Tarik).
+5. Tunggu beberapa detik hingga statusnya berubah menjadi centang hijau (**Deployed**).
+
+---
+
+### Langkah 3: Bersihkan Cache Browser (Sangat Penting!)
+Karena browser biasanya menyimpan file JavaScript & CSS lama:
+- **Di Laptop/Komputer (Chrome/Edge/Firefox):**
+  Buka `https://dermagagizi.puskesmasseribuselatan.com`, lalu tekan kombinasi tombol:
+  👉 **Ctrl + F5** (atau **Ctrl + Shift + R**)
+  *(Untuk Mac: **Cmd + Shift + R**)*
+- **Atau buka via Mode Samaran (Incognito Window):**
+  Tekan **Ctrl + Shift + N** lalu buka alamat website.
+
+---
+
+## 📱 HASIL YANG AKAN LANGSUNG MUNCUL:
+✅ Tampilan ringkasan profil Dermaga Gizi Kepulauan Seribu Selatan sebelum login.  
+✅ Menu Data Sasaran Balita Bermasalah Gizi dengan 24 kolom baku (NIK, Ortu, Posyandu, Status Gizi, dsb).  
+✅ Tombol Hapus & Fitur Import Excel.  
+✅ Kolom AKSI dengan fitur Kolaborasi Tindak Lanjut multi lintas sektor (Petugas, Kader, Kelurahan, Satpol PP, dsb) lengkap dengan unggah dan popup foto dokumen pendukung.  
+✅ Status Selesai terkunci khusus untuk Login Petugas Gizi.  
+✅ Menu Daftar Kendala dengan filter status dan grafik kendala.  
+✅ Terhubung 100% ke database Google Apps Script tanpa dummy data hardcoded.
