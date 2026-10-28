@@ -1,0 +1,60 @@
+name: Auto Build & Deploy to Hostinger Production
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js Environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Build Production Assets (Vite)
+        run: npm run build
+
+      # Langkah 1: Otomatis buat & update branch 'production' dengan isi folder dist
+      # Di branch 'production', file index.html hasil build berada di ROOT branch.
+      # Hostinger tinggal disetel menarik (pull) branch 'production'.
+      - name: Publish Compiled Assets to 'production' Branch
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: production
+          folder: dist
+          clean: true
+          commit-message: "deploy: auto build production assets [skip ci]"
+
+      # Langkah 2: (Opsional) Jika pengguna memasukkan WEBHOOK Hostinger di GitHub Secrets
+      - name: Trigger Hostinger Webhook (Jika Dikonfigurasi)
+        if: env.HOSTINGER_WEBHOOK != ''
+        run: |
+          curl -X GET "${{ secrets.HOSTINGER_WEBHOOK_URL }}"
+        env:
+          HOSTINGER_WEBHOOK: ${{ secrets.HOSTINGER_WEBHOOK_URL }}
+
+      # Langkah 3: (Opsional) Jika pengguna menggunakan FTP Hostinger di GitHub Secrets
+      - name: Deploy via FTP to Hostinger (Jika Dikonfigurasi)
+        if: env.FTP_SERVER != ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.HOSTINGER_FTP_SERVER }}
+          username: ${{ secrets.HOSTINGER_FTP_USERNAME }}
+          password: ${{ secrets.HOSTINGER_FTP_PASSWORD }}
+          local-dir: ./dist/
+          server-dir: ./public_html/
+        env:
+          FTP_SERVER: ${{ secrets.HOSTINGER_FTP_SERVER }}

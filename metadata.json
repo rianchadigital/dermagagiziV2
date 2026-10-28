@@ -1,0 +1,6 @@
+{
+  "name": "DERMAGA GIZI - Puskesmas Kepulauan Seribu Selatan",
+  "description": "Dashboard Elektronik Rekap, Monitoring, dan Analisis Gizi Balita - Puskesmas Kepulauan Seribu Selatan",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

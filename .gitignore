@@ -1,0 +1,13 @@
+node_modules/
+build/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# Pastikan folder dist dan assets selalu di-commit ke GitHub untuk deployment langsung Hostinger
+!dist/
+!dist/**
+!assets/
+!assets/**
