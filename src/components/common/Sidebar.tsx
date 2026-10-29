@@ -247,58 +247,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </button>
         </div>
 
-        {/* Role Banner: Untuk Kader atau Lintas Sektor */}
-        {isKaderOrLintasSektor && (
-          <div className="mx-3 mt-3 p-2.5 rounded-xl bg-emerald-950/50 border border-emerald-500/30 text-emerald-200 text-xs">
-            <div className="font-bold flex items-center gap-1.5 text-emerald-300">
+        {/* Status Indikator Sistem Aktif */}
+        <div className="mx-3 mt-3 p-2.5 rounded-xl bg-sky-950/50 border border-sky-500/30 text-sky-200 text-xs">
+          <div className="font-bold flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-sky-300">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>
-                {currentUser?.role === 'KADER' ? 'Akses Kader Posyandu' : 'Akses Lintas Sektor'}
-              </span>
+              <span>Semua Fitur Aktif</span>
             </div>
-            <p className="text-[10px] text-emerald-200/80 mt-1 leading-tight">
-              Menu aktif: Beranda, Peta Wilayah, Daftar Tindak Lanjut, dan Daftar Kendala.
-            </p>
+            <span className="text-[10px] bg-sky-500/20 text-sky-300 px-1.5 py-0.5 rounded font-mono">
+              {currentUser?.role?.replace(/_/g, ' ') || 'Petugas'}
+            </span>
           </div>
-        )}
+          <p className="text-[10px] text-sky-200/80 mt-1 leading-tight">
+            Akses penuh data sasaran balita, tindak lanjut, kendala, data master, dan database GAS.
+          </p>
+        </div>
 
         {/* Navigation list */}
         <div className="flex-1 overflow-y-auto px-3 py-3 space-y-4">
           
           {/* Main Operational Menus */}
           <div className="space-y-1">
-            {isKaderOrLintasSektor ? (
-              // HANYA 4 MENU UNTUK KADER & LINTAS SEKTOR SESUAI PERMINTAAN USER
-              restrictedNav.map(renderNavButton)
-            ) : (
-              // MENU LENGKAP UNTUK ADMIN & PETUGAS GIZI
-              adminMainNav.map(renderNavButton)
-            )}
+            <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              OPERASIONAL GIZI
+            </div>
+            {adminMainNav.map(renderNavButton)}
           </div>
 
-          {/* DATA MASTER Section (Hanya untuk Tenaga Gizi & Admin) */}
-          {isAdminOrGizi && (
-            <div className="pt-2">
-              <div className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                DATA MASTER
-              </div>
-              <div className="space-y-1">
-                {dataMasterNav.map(renderNavButton)}
-              </div>
+          {/* DATA MASTER Section */}
+          <div className="pt-2">
+            <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              DATA MASTER
             </div>
-          )}
+            <div className="space-y-1">
+              {dataMasterNav.map(renderNavButton)}
+            </div>
+          </div>
 
-          {/* BANTUAN Section (Hanya untuk Tenaga Gizi & Admin) */}
-          {isAdminOrGizi && (
-            <div className="pt-2">
-              <div className="px-3 pb-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                BANTUAN
-              </div>
-              <div className="space-y-1">
-                {bantuanNav.map(renderNavButton)}
-              </div>
+          {/* BANTUAN & SISTEM Section */}
+          <div className="pt-2">
+            <div className="px-3 pb-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+              SISTEM & DATABASE
             </div>
-          )}
+            <div className="space-y-1">
+              {bantuanNav.map(renderNavButton)}
+            </div>
+          </div>
         </div>
 
         {/* Bottom Island Card from Mockup */}

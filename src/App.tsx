@@ -88,21 +88,6 @@ export default function App() {
     });
   };
 
-  // Batasi akses modul untuk peran KADER & LINTAS_SEKTOR:
-  // HANYA muncul 4 menu: Beranda (dashboard), Peta Wilayah (map), Daftar Tindak Lanjut (tindak-lanjut), dan Daftar Kendala (kendala)
-  useEffect(() => {
-    const isAdminOrGizi = currentUser?.role === 'ADMIN' || 
-      currentUser?.role === 'TENAGA_GIZI' || 
-      currentUser?.role === 'KEPALA_PUSKESMAS';
-
-    if (!isAdminOrGizi) {
-      const allowed = ['dashboard', 'map', 'tindak-lanjut', 'kendala'];
-      if (!allowed.includes(activeTab)) {
-        setActiveTab('dashboard');
-      }
-    }
-  }, [currentUser.role, activeTab]);
-
   // Hitung Badge Notifikasi Sidebar
   const stats = storageService.getDashboardStats(filter);
   const overdueCount = stats.overdueList.length;
@@ -116,19 +101,21 @@ export default function App() {
     setRefreshKey(prev => prev + 1);
   }, []);
 
-  // Inisialisasi awal: bersihkan data dummy browser & sinkronkan seketika dengan database Google Apps Script
+  // Inisialisasi awal: muat konfigurasi global GAS, bersihkan dummy browser & sinkronkan seketika dengan database GAS
   useEffect(() => {
-    storageService.cleanDummyData();
-    setIsSyncing(true);
-    apiService.fetchDatabaseData()
-      .then(changed => {
-        if (changed) {
-          handleRefreshData();
-        }
-      })
-      .finally(() => {
-        setIsSyncing(false);
-      });
+    storageService.loadGlobalConfig().then(() => {
+      storageService.cleanDummyData();
+      setIsSyncing(true);
+      apiService.fetchDatabaseData()
+        .then(changed => {
+          if (changed) {
+            handleRefreshData();
+          }
+        })
+        .finally(() => {
+          setIsSyncing(false);
+        });
+    });
   }, [handleRefreshData]);
 
   // Live Auto-Refresh Polling Interval jika tersambung dengan Remote / Cloud Database
@@ -146,21 +133,13 @@ export default function App() {
       } finally {
         setIsSyncing(false);
       }
-    }, 10000);
+    }, 12000);
 
     return () => clearInterval(interval);
   }, [autoRefresh, handleRefreshData]);
 
   const handleSwitchUser = (userId: string) => {
     storageService.setCurrentUser(userId);
-    const u = storageService.getCurrentUser();
-    const isAdminOrGizi = u.role === 'ADMIN' || u.role === 'TENAGA_GIZI' || u.role === 'KEPALA_PUSKESMAS';
-    if (!isAdminOrGizi) {
-      const allowed = ['dashboard', 'map', 'tindak-lanjut', 'kendala'];
-      if (!allowed.includes(activeTab)) {
-        setActiveTab('dashboard');
-      }
-    }
     handleRefreshData();
   };
 
@@ -169,13 +148,6 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('dermaga_is_logged_in', 'true');
     setIsLoggedIn(true);
-    const isAdminOrGizi = user.role === 'ADMIN' || user.role === 'TENAGA_GIZI' || user.role === 'KEPALA_PUSKESMAS';
-    if (!isAdminOrGizi) {
-      const allowed = ['dashboard', 'map', 'tindak-lanjut', 'kendala'];
-      if (!allowed.includes(activeTab)) {
-        setActiveTab('dashboard');
-      }
-    }
     handleRefreshData();
     // Sinkronisasi data dari spreadsheet saat login
     setIsSyncing(true);
@@ -257,7 +229,7 @@ export default function App() {
         {/* Viewport Content */}
         <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">
           <ErrorBoundary
-            key={`${activeTab}-${refreshKey}`}
+            key={activeTab}
             fallbackTitle={`Terjadi Kendala Memuat Modul ${activeTab}`}
             onReset={() => setActiveTab('dashboard')}
           >

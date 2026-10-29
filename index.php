@@ -33,9 +33,44 @@ if (strpos($requestUri, '/assets/') !== false) {
     }
 }
 
+// 1.5. Tangani Permintaan Konfigurasi Global GAS (Simpan & Baca)
+if (strpos($requestUri, 'save-config') !== false && $_SERVER['REQUEST_METHOD'] === 'POST') {
+    $rawInput = file_get_contents('php://input');
+    $data = json_decode($rawInput, true);
+    if (is_array($data) && !empty($data['gasUrl'])) {
+        $savedData = [
+            'gasUrl' => trim($data['gasUrl']),
+            'appName' => 'DERMAGA GIZI',
+            'updatedAt' => date('c'),
+            'status' => 'connected'
+        ];
+        file_put_contents(__DIR__ . '/config.json', json_encode($savedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        if (file_exists(__DIR__ . '/public')) {
+            @file_put_contents(__DIR__ . '/public/config.json', json_encode($savedData, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode(['success' => true, 'message' => 'Konfigurasi global GAS berhasil disimpan!', 'data' => $savedData]);
+        exit;
+    }
+}
+
+if (strpos($requestUri, 'config.json') !== false) {
+    header('Content-Type: application/json; charset=utf-8');
+    header('Cache-Control: no-cache, no-store, must-revalidate');
+    if (file_exists(__DIR__ . '/config.json')) {
+        readfile(__DIR__ . '/config.json');
+    } else {
+        echo json_encode([
+            'gasUrl' => 'https://script.google.com/macros/s/AKfycbws8A6yMS1C7rCCs5afT0skv53UzH3qBpxrWwUvHmoyRQK0MDu9MmbJDpkEMHEmeQKt/exec',
+            'appName' => 'DERMAGA GIZI'
+        ]);
+    }
+    exit;
+}
+
 // 2. Bundle JavaScript dan CSS produksi terbaru
-$jsFile = '/assets/index-D2Om5XiX.js';
-$cssFile = '/assets/index-zRCDMXUE.css';
+$jsFile = '/assets/index-jWwFwYDh.js';
+$cssFile = '/assets/index-Be5fcQsi.css';
 
 // Pencarian dinamis jika file bundle berganti
 $searchDirs = [__DIR__ . '/dist/assets', __DIR__ . '/assets'];
@@ -51,6 +86,18 @@ foreach ($searchDirs as $dir) {
                 $cssFile = '/assets/' . $file;
             }
         }
+    }
+}
+
+// Baca konfigurasi global untuk disuntikkan langsung ke browser
+$globalConfig = [
+    'gasUrl' => 'https://script.google.com/macros/s/AKfycbws8A6yMS1C7rCCs5afT0skv53UzH3qBpxrWwUvHmoyRQK0MDu9MmbJDpkEMHEmeQKt/exec',
+    'appName' => 'DERMAGA GIZI'
+];
+if (file_exists(__DIR__ . '/config.json')) {
+    $rawCfg = json_decode(file_get_contents(__DIR__ . '/config.json'), true);
+    if (is_array($rawCfg) && !empty($rawCfg['gasUrl'])) {
+        $globalConfig = array_merge($globalConfig, $rawCfg);
     }
 }
 
@@ -75,6 +122,9 @@ header('Expires: 0');
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      window.__GLOBAL_CONFIG__ = <?= json_encode($globalConfig, JSON_UNESCAPED_SLASHES) ?>;
+    </script>
     <?php if ($cssFile): ?>
     <link rel="stylesheet" crossorigin href="<?= htmlspecialchars($cssFile) ?>">
     <?php endif; ?>

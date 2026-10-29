@@ -78,26 +78,65 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRefreshData }) => 
     message: ''
   });
 
+  // Global Notification & Dialog States
+  const [globalToast, setGlobalToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    confirmText?: string;
+    isDanger?: boolean;
+    onConfirm: () => void;
+  } | null>(null);
+
   const logs = storageService.getLogs();
 
   const handleSaveUrl = async () => {
-    storageService.setGasUrl(gasUrl);
-    await handleTestConnection();
+    setIsLoading(true);
+    await storageService.setGasUrl(gasUrl);
+    const testRes = await apiService.testConnection(gasUrl);
+    setTestResult({
+      tested: true,
+      success: testRes.success,
+      message: testRes.message,
+      latencyMs: testRes.latencyMs,
+      details: testRes.details
+    });
+
     if (gasUrl.trim()) {
       await apiService.fetchDatabaseData();
     }
+    setIsLoading(false);
     onRefreshData();
+
+    setGlobalToast({
+      type: testRes.success ? 'success' : 'info',
+      message: `Konfigurasi URL GAS berhasil disimpan secara GLOBAL! Seluruh browser, komputer, dan perangkat lain otomatis tersinkron ke database Google Spreadsheet.`
+    });
+    setTimeout(() => setGlobalToast(null), 6000);
   };
 
   const handleCleanDummyAndSyncGAS = async () => {
-    if (window.confirm('Bersihkan seluruh data dummy di browser dan sinkronkan data langsung dari database Google Spreadsheet (GAS)?')) {
-      storageService.cleanDummyData(true);
-      setIsLoading(true);
-      await apiService.fetchDatabaseData();
-      setIsLoading(false);
-      onRefreshData();
-      alert('Data dummy browser berhasil dibersihkan! Aplikasi kini terhubung langsung dengan database Google Apps Script.');
-    }
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Bersihkan Dummy & Sinkron Database GAS',
+      message: 'Apakah Anda ingin membersihkan seluruh cache dummy lokal di browser dan menyinkronkan data langsung dari Google Spreadsheet?',
+      confirmText: 'Ya, Bersihkan & Sinkronkan',
+      isDanger: false,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        storageService.cleanDummyData(true);
+        setIsLoading(true);
+        await apiService.fetchDatabaseData();
+        setIsLoading(false);
+        onRefreshData();
+        setGlobalToast({
+          type: 'success',
+          message: 'Data dummy browser berhasil dibersihkan! Aplikasi kini 100% berfokus dan tersinkronisasi dengan database Google Spreadsheet.'
+        });
+        setTimeout(() => setGlobalToast(null), 5000);
+      }
+    });
   };
 
   const handleTestConnection = async () => {
@@ -141,26 +180,42 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRefreshData }) => 
   };
 
   const handleTriggerClearDatabase = async () => {
-    if (!window.confirm('Apakah Anda yakin ingin membersihkan semua baris data di Google Spreadsheet? Hanya baris 1 (Header Kolom) yang akan dipertahankan.')) {
-      return;
-    }
-    setClearLoading(true);
-    try {
-      const res = await apiService.clearAllDatabaseRows(gasUrl);
-      alert(res.message || 'Pembersihan data di spreadsheet selesai.');
-      if (res.success) {
-        onRefreshData();
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Konfirmasi Bersihkan Data Sheet',
+      message: 'Apakah Anda yakin ingin mengosongkan seluruh baris data di Google Spreadsheet? Baris 1 (Header Kolom) akan dipertahankan.',
+      confirmText: 'Bersihkan Data Sheet',
+      isDanger: true,
+      onConfirm: async () => {
+        setConfirmDialog(null);
+        setClearLoading(true);
+        try {
+          const res = await apiService.clearAllDatabaseRows(gasUrl);
+          setGlobalToast({
+            type: res.success ? 'success' : 'error',
+            message: res.message || 'Pembersihan baris data Google Spreadsheet selesai.'
+          });
+          setTimeout(() => setGlobalToast(null), 5000);
+          if (res.success) {
+            onRefreshData();
+          }
+        } catch (e: any) {
+          setGlobalToast({
+            type: 'error',
+            message: 'Gagal membersihkan data: ' + e.message
+          });
+          setTimeout(() => setGlobalToast(null), 5000);
+        } finally {
+          setClearLoading(false);
+        }
       }
-    } catch (e: any) {
-      alert('Gagal membersihkan data: ' + e.message);
-    } finally {
-      setClearLoading(false);
-    }
+    });
   };
 
   const handleSendTestWa = async () => {
     if (!testPhone.trim()) {
-      alert('Masukkan nomor WhatsApp tujuan pengetesan.');
+      setGlobalToast({ type: 'info', message: 'Silakan masukkan nomor WhatsApp tujuan uji coba.' });
+      setTimeout(() => setGlobalToast(null), 4000);
       return;
     }
 
@@ -629,12 +684,24 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRefreshData }) => 
       {activeTab === 'koneksi' && (
         <div className="space-y-6">
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-xs space-y-4 text-xs">
+            
+            {/* Global Persistence Badge */}
+            <div className="p-3 bg-sky-50 border border-sky-200 rounded-xl flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-sky-900 font-semibold">
+                <span className="w-2.5 h-2.5 rounded-full bg-sky-500 animate-pulse" />
+                <span>Penyimpanan Terpusat Global Aktif</span>
+              </div>
+              <span className="text-[11px] text-sky-700 bg-sky-100 px-2 py-0.5 rounded font-medium">
+                Berlaku Otomatis untuk Semua Browser & Perangkat
+              </span>
+            </div>
+
             <div>
               <label className="block font-bold text-slate-900 text-sm mb-1">
-                URL Google Apps Script Web App (API Endpoint)
+                URL Google Apps Script Web App (API Endpoint Database)
               </label>
               <p className="text-slate-500 mb-2 leading-relaxed">
-                Masukkan URL Web App hasil deployment Google Apps Script (berakhiran <code className="bg-slate-100 px-1 py-0.5 rounded text-sky-800">/exec</code>). Saat belum diisi, aplikasi beroperasi dalam Mode Demo yang aman dengan data lokal.
+                Masukkan URL Web App hasil deployment Google Apps Script (berakhiran <code className="bg-slate-100 px-1 py-0.5 rounded text-sky-800 font-mono">/exec</code>). Saat disimpan, konfigurasi ini otomatis disematkan dan berlaku secara <strong>GLOBAL</strong> di seluruh peramban (browser) dan perangkat tanpa terkecuali.
               </p>
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
@@ -647,10 +714,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRefreshData }) => 
                 <button
                   onClick={handleSaveUrl}
                   disabled={isLoading}
-                  className="px-4 py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl transition-colors shrink-0 flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  className="px-4 py-2.5 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-700 hover:to-indigo-700 text-white font-bold rounded-xl shadow-xs transition-all shrink-0 flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
                 >
                   {isLoading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
-                  <span>Simpan & Uji Koneksi</span>
+                  <span>Simpan & Terapkan Secara Global</span>
                 </button>
               </div>
             </div>
@@ -773,6 +840,59 @@ export const SettingsView: React.FC<SettingsViewProps> = ({ onRefreshData }) => 
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Global Toast Notification */}
+      {globalToast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-md animate-slide-up">
+          <div className={`p-4 rounded-2xl shadow-xl border flex items-start gap-3 ${
+            globalToast.type === 'success' 
+              ? 'bg-emerald-950 text-emerald-100 border-emerald-500/40' 
+              : globalToast.type === 'error'
+              ? 'bg-rose-950 text-rose-100 border-rose-500/40'
+              : 'bg-sky-950 text-sky-100 border-sky-500/40'
+          }`}>
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+            <div className="text-xs leading-relaxed">{globalToast.message}</div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirmation Dialog Modal */}
+      {confirmDialog && confirmDialog.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${confirmDialog.isDanger ? 'bg-rose-100 text-rose-600' : 'bg-sky-100 text-sky-600'}`}>
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900 dark:text-white">{confirmDialog.title}</h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">{confirmDialog.message}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+              <button
+                type="button"
+                onClick={() => setConfirmDialog(null)}
+                className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={confirmDialog.onConfirm}
+                className={`px-4 py-2 rounded-xl text-xs font-bold text-white transition-colors cursor-pointer ${
+                  confirmDialog.isDanger 
+                    ? 'bg-rose-600 hover:bg-rose-700' 
+                    : 'bg-sky-600 hover:bg-sky-700'
+                }`}
+              >
+                {confirmDialog.confirmText || 'Konfirmasi'}
+              </button>
+            </div>
           </div>
         </div>
       )}

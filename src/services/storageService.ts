@@ -301,8 +301,14 @@ class StorageService {
     this.addLog('RESET', 'SYSTEM', 'SYS-001', 'Data operasional dibersihkan dan siap sinkron ke GAS', 'SUCCESS');
   }
 
-  // --- GAS URL Config ---
+  // --- GAS URL Config (Universal Global Support Across All Browsers) ---
   public getGasUrl(): string {
+    if (typeof window !== 'undefined' && (window as any).__GLOBAL_CONFIG__?.gasUrl) {
+      const gUrl = String((window as any).__GLOBAL_CONFIG__.gasUrl).trim();
+      if (gUrl.startsWith('https://script.google.com/')) {
+        return gUrl;
+      }
+    }
     const custom = localStorage.getItem(STORAGE_KEYS.GAS_URL);
     if (custom && custom.trim().startsWith('https://script.google.com/')) {
       return custom.trim();
@@ -310,8 +316,46 @@ class StorageService {
     return 'https://script.google.com/macros/s/AKfycbws8A6yMS1C7rCCs5afT0skv53UzH3qBpxrWwUvHmoyRQK0MDu9MmbJDpkEMHEmeQKt/exec';
   }
 
-  public setGasUrl(url: string) {
-    localStorage.setItem(STORAGE_KEYS.GAS_URL, url.trim());
+  public async setGasUrl(url: string): Promise<boolean> {
+    const cleanUrl = url.trim();
+    localStorage.setItem(STORAGE_KEYS.GAS_URL, cleanUrl);
+    if (typeof window !== 'undefined') {
+      (window as any).__GLOBAL_CONFIG__ = {
+        ...((window as any).__GLOBAL_CONFIG__ || {}),
+        gasUrl: cleanUrl,
+        updatedAt: new Date().toISOString()
+      };
+    }
+    try {
+      await fetch('/api/save-config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gasUrl: cleanUrl })
+      });
+    } catch {
+      // Offline / standalone fallback
+    }
+    this.addLog('UPDATE', 'SYSTEM', 'SYS-GAS', `URL Google Apps Script disimpan secara global: ${cleanUrl.slice(0, 45)}...`, 'SUCCESS');
+    return true;
+  }
+
+  public async loadGlobalConfig(): Promise<string> {
+    try {
+      const res = await fetch('/config.json?_t=' + Date.now());
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.gasUrl && typeof data.gasUrl === 'string' && data.gasUrl.startsWith('https://script.google.com/')) {
+          if (typeof window !== 'undefined') {
+            (window as any).__GLOBAL_CONFIG__ = data;
+          }
+          localStorage.setItem(STORAGE_KEYS.GAS_URL, data.gasUrl.trim());
+          return data.gasUrl.trim();
+        }
+      }
+    } catch {
+      // Ignore
+    }
+    return this.getGasUrl();
   }
 
   // --- Users & RBAC ---
