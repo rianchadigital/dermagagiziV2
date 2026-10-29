@@ -375,7 +375,7 @@ export const InputLaporanPosyanduView: React.FC<InputLaporanPosyanduViewProps> =
                 <span>{currentUser.nama}</span>
               </div>
               <div className="text-[10px] text-sky-300 font-mono mt-0.5">
-                Peran: {currentUser.role.replace(/_/g, ' ')}
+                Peran: {String(currentUser.role || '').replace(/_/g, ' ')}
               </div>
             </div>
           </div>

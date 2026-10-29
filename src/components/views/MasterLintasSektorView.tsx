@@ -58,6 +58,7 @@ export const MasterLintasSektorView: React.FC<MasterLintasSektorViewProps> = ({
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<Partial<UserLintasSektor>>({});
+  const [deleteConfirmLintas, setDeleteConfirmLintas] = useState<{ id: string; nama: string } | null>(null);
 
   const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'KEPALA_PUSKESMAS' || currentUser?.role === 'TENAGA_GIZI';
 
@@ -114,7 +115,7 @@ export const MasterLintasSektorView: React.FC<MasterLintasSektorViewProps> = ({
     const payload: UserLintasSektor = {
       ...(editingUser as UserLintasSektor),
       kelurahan_nama: kelNama,
-      no_wa: editingUser.no_wa.replace(/\s+/g, '')
+      no_wa: String(editingUser.no_wa || '').replace(/\s+/g, '')
     };
 
     await apiService.saveUserLintasSektor(payload);
@@ -122,11 +123,15 @@ export const MasterLintasSektorView: React.FC<MasterLintasSektorViewProps> = ({
     onRefreshData();
   };
 
-  const handleDelete = async (id: string, nama: string) => {
-    if (window.confirm(`Yakin ingin menghapus kontak lintas sektor "${nama}"?`)) {
-      await apiService.deleteUserLintasSektor(id);
-      onRefreshData();
-    }
+  const handleDelete = (id: string, nama: string) => {
+    setDeleteConfirmLintas({ id, nama });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteConfirmLintas) return;
+    await apiService.deleteUserLintasSektor(deleteConfirmLintas.id);
+    setDeleteConfirmLintas(null);
+    onRefreshData();
   };
 
   const handleToggleNotifWa = async (u: UserLintasSektor) => {
@@ -260,7 +265,7 @@ export const MasterLintasSektorView: React.FC<MasterLintasSektorViewProps> = ({
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
               {filteredUsers.map((u) => {
-                const phoneClean = (u.no_wa || '').replace(/\D/g, '');
+                const phoneClean = String(u.no_wa || '').replace(/\D/g, '');
                 return (
                   <tr key={u.user_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                     <td className="py-3 px-4">
@@ -498,6 +503,44 @@ export const MasterLintasSektorView: React.FC<MasterLintasSektorViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS LINTAS SEKTOR */}
+      {deleteConfirmLintas && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-rose-200 dark:border-rose-900 text-xs text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800 text-rose-600">
+              <Trash2 className="w-5 h-5 shrink-0" />
+              <span className="font-bold text-slate-900 dark:text-white text-base">Hapus Kontak Lintas Sektor</span>
+            </div>
+
+            <div className="py-3 space-y-2">
+              <p className="text-slate-600 dark:text-slate-300">
+                Yakin ingin menghapus kontak <strong>"{deleteConfirmLintas.nama}"</strong> dari master data lintas sektor?
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Data akan dihapus dari sistem dan database Google Spreadsheet.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmLintas(null)}
+                className="px-3.5 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold cursor-pointer"
+              >
+                Ya, Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

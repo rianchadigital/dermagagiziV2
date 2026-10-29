@@ -183,7 +183,7 @@ export const Header: React.FC<HeaderProps> = ({
                       <UserCircle2 className="w-4 h-4 mt-0.5 text-slate-400 shrink-0" />
                       <div>
                         <div className="text-xs leading-tight font-medium">{u.nama}</div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{u.role.replace(/_/g, ' ')} · {u.unit}</div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400">{String(u.role || '').replace(/_/g, ' ')} · {u.unit}</div>
                       </div>
                     </button>
                   ))}

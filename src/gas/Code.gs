@@ -696,6 +696,7 @@ function doPost(e) {
 
     // CRUD User Sistem
     if (action === 'createUser' || action === 'updateUser') return handleCreateOrUpdateRecord(SHEETS.USERS, HEADERS.USERS, 'user_id', data.user_id, data, 'USER', currentUser);
+    if (action === 'deleteUser') return handleDeleteRecord(SHEETS.USERS, 'user_id', data.user_id, 'USER', currentUser);
 
     // CRUD Kendala
     if (action === 'createKendala' || action === 'updateKendala') return handleCreateOrUpdateRecord(SHEETS.KENDALA, HEADERS.KENDALA, 'kendala_id', data.kendala_id, data, 'KENDALA', currentUser);

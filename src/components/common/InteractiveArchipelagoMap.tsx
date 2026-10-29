@@ -13,6 +13,7 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { Pulau } from '../../types';
+import { storageService } from '../../services/storageService';
 
 interface InteractiveArchipelagoMapProps {
   pulauList: Pulau[];
@@ -32,16 +33,37 @@ export const InteractiveArchipelagoMap: React.FC<InteractiveArchipelagoMapProps>
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [hoveredPulau, setHoveredPulau] = useState<string | null>(null);
 
-  // Island definitions with geographic positioning within canvas (400 x 300 virtual coordinate space)
+  const allSasaran = storageService.getSasaranList();
+  const allTL = storageService.getTindakLanjutList();
+
+  const getIslandStats = (pulauId: string) => {
+    const sList = allSasaran.filter(s => s.pulau_id === pulauId);
+    const tlList = allTL.filter(t => {
+      const s = allSasaran.find(item => item.sasaran_id === t.sasaran_id);
+      return s && s.pulau_id === pulauId;
+    });
+    return {
+      sasaran: sList.length,
+      perluTL: tlList.filter(t => !['Selesai', 'Lulus Intervensi', 'Lulus Usia', 'Pindah Domisili', 'Meninggal'].includes(t.status)).length,
+      tertunda: tlList.filter(t => t.status === 'Belum ditindaklanjuti').length
+    };
+  };
+
+  const tidungStats = getIslandStats('PULAU-01');
+  const pariStats = getIslandStats('PULAU-02');
+  const lancangStats = getIslandStats('PULAU-03');
+  const untungStats = getIslandStats('PULAU-04');
+
+  // Island definitions with real dynamic metrics from Google Spreadsheet database
   const islands = [
     {
       id: 'PULAU-01',
       name: 'Pulau Tidung',
       cx: 120,
       cy: 90,
-      sasaran: 28,
-      perluTL: 20,
-      tertunda: 6,
+      sasaran: tidungStats.sasaran,
+      perluTL: tidungStats.perluTL,
+      tertunda: tidungStats.tertunda,
       status: 'Lancar',
       statusColor: '#10b981',
       path: 'M95,85 Q115,75 145,85 Q165,95 135,102 Q105,100 95,85 Z',
@@ -53,9 +75,9 @@ export const InteractiveArchipelagoMap: React.FC<InteractiveArchipelagoMapProps>
       name: 'Pulau Pari',
       cx: 260,
       cy: 140,
-      sasaran: 24,
-      perluTL: 17,
-      tertunda: 7,
+      sasaran: pariStats.sasaran,
+      perluTL: pariStats.perluTL,
+      tertunda: pariStats.tertunda,
       status: 'Lancar',
       statusColor: '#10b981',
       path: 'M245,130 Q265,125 285,135 Q290,148 275,152 Q255,150 245,130 Z'
@@ -65,9 +87,9 @@ export const InteractiveArchipelagoMap: React.FC<InteractiveArchipelagoMapProps>
       name: 'Pulau Lancang',
       cx: 140,
       cy: 210,
-      sasaran: 12,
-      perluTL: 9,
-      tertunda: 3,
+      sasaran: lancangStats.sasaran,
+      perluTL: lancangStats.perluTL,
+      tertunda: lancangStats.tertunda,
       status: 'Perlu koordinasi',
       statusColor: '#f59e0b',
       path: 'M125,205 Q145,198 155,210 Q145,222 130,218 Z'
@@ -77,9 +99,9 @@ export const InteractiveArchipelagoMap: React.FC<InteractiveArchipelagoMapProps>
       name: 'Pulau Untung Jawa',
       cx: 300,
       cy: 235,
-      sasaran: 8,
-      perluTL: 7,
-      tertunda: 1,
+      sasaran: untungStats.sasaran,
+      perluTL: untungStats.perluTL,
+      tertunda: untungStats.tertunda,
       status: 'Lancar',
       statusColor: '#10b981',
       path: 'M285,225 Q310,220 320,235 Q305,248 290,242 Z'

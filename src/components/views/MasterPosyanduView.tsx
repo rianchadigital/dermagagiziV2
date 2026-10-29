@@ -45,6 +45,9 @@ export const MasterPosyanduView: React.FC<MasterPosyanduViewProps> = ({
   const [isKelurahanModalOpen, setIsKelurahanModalOpen] = useState(false);
   const [editingKelurahan, setEditingKelurahan] = useState<Partial<Kelurahan>>({});
 
+  // Modal Delete Posyandu State
+  const [deleteConfirmPosyandu, setDeleteConfirmPosyandu] = useState<{ id: string; nama: string } | null>(null);
+
   const canManage = currentUser?.role === 'ADMIN' || currentUser?.role === 'TENAGA_GIZI' || currentUser?.role === 'KEPALA_PUSKESMAS';
 
   // Filtered Posyandu list
@@ -108,11 +111,15 @@ export const MasterPosyanduView: React.FC<MasterPosyanduViewProps> = ({
     onRefreshData();
   };
 
-  const handleDeletePosyandu = async (id: string, nama: string) => {
-    if (window.confirm(`Yakin ingin menghapus posyandu "${nama}" dari master data?`)) {
-      await apiService.deletePosyandu(id);
-      onRefreshData();
-    }
+  const handleDeletePosyandu = (id: string, nama: string) => {
+    setDeleteConfirmPosyandu({ id, nama });
+  };
+
+  const handleConfirmDeletePosyandu = async () => {
+    if (!deleteConfirmPosyandu) return;
+    await apiService.deletePosyandu(deleteConfirmPosyandu.id);
+    setDeleteConfirmPosyandu(null);
+    onRefreshData();
   };
 
   // Handlers Kelurahan
@@ -237,7 +244,7 @@ export const MasterPosyanduView: React.FC<MasterPosyanduViewProps> = ({
                       : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  {(k.nama_kelurahan || '').replace('Kelurahan ', '')}
+                  {String(k.nama_kelurahan || '').replace('Kelurahan ', '')}
                 </button>
               ))}
             </div>
@@ -273,7 +280,7 @@ export const MasterPosyanduView: React.FC<MasterPosyanduViewProps> = ({
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
                   {filteredPosyandu.map((pos) => {
-                    const waClean = (pos.no_wa_kader || '').replace(/\D/g, '');
+                    const waClean = String(pos.no_wa_kader || '').replace(/\D/g, '');
                     return (
                     <tr key={pos.posyandu_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
                       <td className="py-3 px-4">
@@ -368,8 +375,12 @@ export const MasterPosyanduView: React.FC<MasterPosyanduViewProps> = ({
           {safeKelurahanList.map((kel) => {
             const posyanduInKel = storageService.getPosyanduList(kel?.kelurahan_id) || [];
             const totalSasaran = posyanduInKel.reduce((acc, p) => acc + (p?.total_sasaran || 0), 0);
-            const lurahWaClean = (kel?.no_wa_lurah || '').replace(/\D/g, '');
-            const safeDaftarPulau = Array.isArray(kel?.daftar_pulau) ? kel.daftar_pulau : [];
+            const lurahWaClean = String(kel?.no_wa_lurah || '').replace(/\D/g, '');
+            const safeDaftarPulau = Array.isArray(kel?.daftar_pulau) 
+              ? kel.daftar_pulau 
+              : (typeof kel?.daftar_pulau === 'string' 
+                  ? (kel.daftar_pulau as string).split(',').map((s: string) => s.trim()).filter(Boolean) 
+                  : []);
 
             return (
               <div 
@@ -717,6 +728,44 @@ export const MasterPosyanduView: React.FC<MasterPosyanduViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL KONFIRMASI HAPUS POSYANDU */}
+      {deleteConfirmPosyandu && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-sm w-full p-5 shadow-2xl border border-rose-200 dark:border-rose-900 text-xs text-slate-800 dark:text-slate-200">
+            <div className="flex items-center gap-2 pb-3 border-b border-slate-100 dark:border-slate-800 text-rose-600">
+              <Trash2 className="w-5 h-5 shrink-0" />
+              <span className="font-bold text-slate-900 dark:text-white text-base">Hapus Posyandu</span>
+            </div>
+
+            <div className="py-3 space-y-2">
+              <p className="text-slate-600 dark:text-slate-300">
+                Yakin ingin menghapus posyandu <strong>"{deleteConfirmPosyandu.nama}"</strong> dari master data?
+              </p>
+              <p className="text-[11px] text-slate-400">
+                Tindakan ini akan menghapus data posyandu dari sistem dan database Google Spreadsheet.
+              </p>
+            </div>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setDeleteConfirmPosyandu(null)}
+                className="px-3.5 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl font-semibold cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePosyandu}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-semibold cursor-pointer"
+              >
+                Ya, Hapus
+              </button>
+            </div>
           </div>
         </div>
       )}

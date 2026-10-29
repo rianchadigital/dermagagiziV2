@@ -34,8 +34,8 @@ if (strpos($requestUri, '/assets/') !== false) {
 }
 
 // 2. Bundle JavaScript dan CSS produksi terbaru
-$jsFile = '/assets/index-BaCm_kwq.js';
-$cssFile = '/assets/index-DefqAUgF.css';
+$jsFile = '/assets/index-D2Om5XiX.js';
+$cssFile = '/assets/index-zRCDMXUE.css';
 
 // Pencarian dinamis jika file bundle berganti
 $searchDirs = [__DIR__ . '/dist/assets', __DIR__ . '/assets'];

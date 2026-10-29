@@ -33,7 +33,12 @@ import {
   Scale,
   Ruler,
   Camera,
-  Phone
+  Phone,
+  Printer,
+  FileText,
+  Award,
+  Truck,
+  HeartCrack
 } from 'lucide-react';
 import { 
   GlobalFilter, 
@@ -95,6 +100,19 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
   
   // Modal Popup Rincian Pasien & Kolaborasi Intervensi Seluruh Lintas Sektor (Eye Button)
   const [detailPasienTL, setDetailPasienTL] = useState<TindakLanjut | null>(null);
+
+  // Modal Aksi Status Intervensi (Lulus Intervensi, Lulus Usia, Pindah Domisili, Meninggal)
+  const [statusIntervensiModal, setStatusIntervensiModal] = useState<{
+    isOpen: boolean;
+    tl: TindakLanjut | null;
+    status: StatusTindakLanjut;
+    catatan: string;
+  }>({
+    isOpen: false,
+    tl: null,
+    status: 'Dalam proses',
+    catatan: ''
+  });
   
   const [waAlertModal, setWaAlertModal] = useState<{
     isOpen: boolean;
@@ -214,8 +232,12 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
       // Filter status tab
       if (selectedStatusTab === 'Terjadwal' && tl.status !== 'Menunggu koordinasi') return false;
       if (selectedStatusTab === 'Dalam proses' && tl.status !== 'Dalam proses') return false;
-      if (selectedStatusTab === 'Selesai' && tl.status !== 'Selesai') return false;
+      if (selectedStatusTab === 'Selesai' && !['Selesai', 'Lulus Intervensi', 'Lulus Usia', 'Pindah Domisili', 'Meninggal'].includes(tl.status)) return false;
       if (selectedStatusTab === 'Terlambat' && tl.status !== 'Belum ditindaklanjuti') return false;
+      if (selectedStatusTab === 'Lulus Intervensi' && tl.status !== 'Lulus Intervensi') return false;
+      if (selectedStatusTab === 'Lulus Usia' && tl.status !== 'Lulus Usia') return false;
+      if (selectedStatusTab === 'Pindah Domisili' && tl.status !== 'Pindah Domisili') return false;
+      if (selectedStatusTab === 'Meninggal' && tl.status !== 'Meninggal') return false;
 
       // Filter kategori
       if (selectedKategoriFilter !== 'ALL' && tl.kategori !== selectedKategoriFilter) return false;
@@ -275,6 +297,407 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
 
   const handleOpenDetail = (tl: TindakLanjut) => {
     setDetailPasienTL(tl);
+  };
+
+  const handleOpenStatusModal = (tl: TindakLanjut) => {
+    setStatusIntervensiModal({
+      isOpen: true,
+      tl: { ...tl },
+      status: tl.status || 'Dalam proses',
+      catatan: ''
+    });
+  };
+
+  const handleSaveStatusModal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!statusIntervensiModal.tl) return;
+
+    const currentTL = statusIntervensiModal.tl;
+    const newStatus = statusIntervensiModal.status;
+    const nowStr = new Date().toLocaleDateString('id-ID');
+    const noteLine = statusIntervensiModal.catatan.trim() 
+      ? `[${nowStr}] Status intervensi diperbarui ke "${newStatus}": ${statusIntervensiModal.catatan.trim()}`
+      : `[${nowStr}] Status intervensi diperbarui ke "${newStatus}"`;
+
+    const updatedTL: TindakLanjut = {
+      ...currentTL,
+      status: newStatus,
+      catatan: currentTL.catatan ? `${currentTL.catatan}\n${noteLine}` : noteLine,
+      updated_at: nowStr
+    };
+
+    // Jika balita berstatus Lulus Usia, Pindah Domisili, atau Meninggal, sesuaikan status_aktif pada sasaran
+    if (['Lulus Usia', 'Pindah Domisili', 'Meninggal'].includes(newStatus)) {
+      const targetSasaran = allSasaran.find(s => s.sasaran_id === currentTL.sasaran_id);
+      if (targetSasaran) {
+        storageService.saveSasaran({
+          ...targetSasaran,
+          status_aktif: false
+        });
+      }
+    } else if (newStatus === 'Lulus Intervensi') {
+      const targetSasaran = allSasaran.find(s => s.sasaran_id === currentTL.sasaran_id);
+      if (targetSasaran) {
+        storageService.saveSasaran({
+          ...targetSasaran,
+          status_aktif: true,
+          kategori_masalah_terakhir: 'Gizi Baik (Normal)'
+        });
+      }
+    }
+
+    await apiService.saveTindakLanjut(updatedTL, false);
+    setStatusIntervensiModal({ isOpen: false, tl: null, status: 'Dalam proses', catatan: '' });
+    if (detailPasienTL && detailPasienTL.tindak_lanjut_id === updatedTL.tindak_lanjut_id) {
+      setDetailPasienTL(updatedTL);
+    }
+    onRefreshData();
+  };
+
+  const handlePrintHistoryPDF = (tl: TindakLanjut) => {
+    const sasaran = allSasaran.find(s => s.sasaran_id === tl.sasaran_id);
+    const pulau = pulauList.find(p => p.pulau_id === sasaran?.pulau_id);
+    const pj = allUsers.find(u => u.user_id === tl.petugas_id);
+    const listAksi = tl.tindak_lanjut_lintas_sektor || [];
+    const tanggalCetak = new Date().toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+
+    const kodeSasaran = sasaran?.kode_sasaran || tl.sasaran_id;
+    const namaInisial = sasaran?.inisial || 'Balita';
+    const jenisKelamin = sasaran?.jenis_kelamin === 'L' ? 'Laki-laki' : 'Perempuan';
+    const namaPulau = pulau?.nama_pulau || 'Kepulauan Seribu Selatan';
+    const posyanduNama = tl.posyandu_nama || sasaran?.posyandu || '-';
+    const kelurahanNama = tl.kelurahan_nama || sasaran?.kelurahan_nama || '-';
+    const nik = sasaran?.nik || '-';
+    const namaOrtu = sasaran?.nama_ortu || '-';
+    const tglLahir = sasaran?.tanggal_lahir || '-';
+    const usia = sasaran?.usia || '-';
+    const noHp = sasaran?.no_hp || sasaran?.no_wa_ortu || '-';
+    const statusGizi = sasaran?.kategori_masalah_terakhir || tl.kategori;
+    const isNormal = statusGizi.includes('Normal') || statusGizi.includes('Baik');
+
+    const bb = sasaran?.bb_terakhir ? `${sasaran.bb_terakhir} kg` : '-';
+    const tb = sasaran?.tb_terakhir ? `${sasaran.tb_terakhir} cm` : '-';
+    const lila = sasaran?.lila ? `${sasaran.lila} cm` : '-';
+    const zscoreBbtb = sasaran?.zscore_bbtb ?? '-';
+    const zscoreTbu = sasaran?.zscore_tbu ?? '-';
+    const zscoreBbu = sasaran?.zscore_bbu ?? '-';
+    const tglUkur = sasaran?.tanggal_ukur || sasaran?.tanggal_pantau_terakhir || tl.tanggal_rencana;
+
+    const catatanRows = tl.catatan
+      ? `<tr><th>Catatan Tambahan</th><td>${tl.catatan.replace(/\n/g, '<br />')}</td></tr>`
+      : '';
+    const kendalaRows = tl.kendala_kategori
+      ? `<tr><th style="color: #b91c1c;">Kendala Lapangan</th><td style="color: #b91c1c;"><strong>[${tl.kendala_kategori}]</strong> ${tl.kendala_detail || '-'} <em>(Status: ${tl.kendala_status || 'Ada Kendala'})</em></td></tr>`
+      : '';
+
+    const klinisFotoHtml = tl.foto_dokumen
+      ? `<div style="margin-bottom: 12px; page-break-inside: avoid;">
+          <div style="font-size: 9pt; font-weight: bold; color: #475569; margin-bottom: 4px;">Foto Bukti Pelayanan Klinis Puskesmas:</div>
+          <div class="photo-card">
+            <img src="${tl.foto_dokumen}" alt="Foto Bukti Klinis" />
+            <div class="photo-caption">Lampiran foto pelayanan/dokumen medis</div>
+          </div>
+        </div>`
+      : '';
+
+    const aksiRowsHtml = listAksi.length === 0
+      ? '<p style="font-size: 9pt; color: #64748b; font-style: italic; margin: 8px 0;">Belum ada catatan aksi tindak lanjut dari mitra lintas sektor untuk balita ini.</p>'
+      : `<table class="bordered">
+          <thead>
+            <tr>
+              <th style="width: 5%;">No</th>
+              <th style="width: 14%;">Tanggal</th>
+              <th style="width: 22%;">Sektor & Petugas</th>
+              <th style="width: 32%;">Aksi Intervensi Dilakukan</th>
+              <th style="width: 12%;">Status Hasil</th>
+              <th style="width: 15%;">Foto Bukti</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${listAksi.map((aksi, idx) => `
+              <tr>
+                <td style="text-align: center;">${idx + 1}</td>
+                <td style="font-size: 8.5pt;">${aksi.tanggal_pelaksanaan}</td>
+                <td>
+                  <strong>${aksi.nama_unit}</strong><br />
+                  <span style="font-size: 8.5pt; color: #64748b;">${aksi.nama_petugas} (${aksi.jabatan || aksi.unit_sektor})</span>
+                </td>
+                <td>
+                  <div>${aksi.aksi_intervensi}</div>
+                  ${aksi.catatan_evaluasi ? `<div style="margin-top: 4px; font-size: 8.5pt; color: #475569; background: #f8fafc; padding: 3px 6px; border-radius: 4px;"><em>Catatan:</em> ${aksi.catatan_evaluasi}</div>` : ''}
+                </td>
+                <td><span class="badge ${aksi.status_hasil === 'Selesai' ? 'badge-success' : 'badge-info'}">${aksi.status_hasil}</span></td>
+                <td style="text-align: center;">
+                  ${aksi.foto_dokumen ? `
+                    <div class="photo-card" style="max-width: 110px;">
+                      <img src="${aksi.foto_dokumen}" style="height: 75px;" alt="Bukti Foto" />
+                      <div class="photo-caption">${aksi.foto_nama || 'Foto Bukti'}</div>
+                    </div>
+                  ` : '<span style="font-size: 8pt; color: #94a3b8;">- Tidak ada foto -</span>'}
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>`;
+
+    const htmlContent = `<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8" />
+  <title>Rekam Jejak Tindak Lanjut - ${kodeSasaran} (${namaInisial})</title>
+  <style>
+    * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #1e293b;
+      background: #ffffff;
+      margin: 0;
+      padding: 24px;
+      font-size: 10.5pt;
+      line-height: 1.45;
+    }
+    @page {
+      size: A4;
+      margin: 12mm 15mm 15mm 15mm;
+    }
+    .kop-header {
+      text-align: center;
+      border-bottom: 3px double #0f172a;
+      padding-bottom: 12px;
+      margin-bottom: 16px;
+    }
+    .kop-header h2 { margin: 0; font-size: 12pt; font-weight: 800; letter-spacing: 0.5px; }
+    .kop-header h1 { margin: 2px 0; font-size: 14pt; font-weight: 900; color: #0284c7; }
+    .kop-header p { margin: 2px 0; font-size: 9pt; color: #475569; }
+    .doc-title {
+      text-align: center;
+      margin: 12px 0 16px 0;
+    }
+    .doc-title h3 {
+      margin: 0;
+      font-size: 12pt;
+      text-transform: uppercase;
+      font-weight: 800;
+      text-decoration: underline;
+      color: #0f172a;
+    }
+    .doc-title span { font-size: 9pt; color: #64748b; font-family: monospace; }
+    .section-title {
+      font-size: 10pt;
+      font-weight: bold;
+      color: #0369a1;
+      background: #f0f9ff;
+      border-left: 4px solid #0284c7;
+      padding: 4px 8px;
+      margin: 14px 0 8px 0;
+      text-transform: uppercase;
+    }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 9.5pt; }
+    table.bordered th, table.bordered td { border: 1px solid #cbd5e1; padding: 6px 8px; text-align: left; vertical-align: top; }
+    table.bordered th { background-color: #f8fafc; font-weight: bold; color: #334155; }
+    table.profile td { padding: 4px 6px; border: none; vertical-align: top; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: 8.5pt;
+      font-weight: bold;
+    }
+    .badge-danger { background: #fee2e2; color: #991b1b; }
+    .badge-success { background: #dcfce7; color: #166534; }
+    .badge-info { background: #e0f2fe; color: #075985; }
+    .badge-status { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+    .photo-card {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px;
+      background: #f8fafc;
+      display: inline-block;
+      max-width: 220px;
+      page-break-inside: avoid;
+    }
+    .photo-card img {
+      max-width: 100%;
+      height: 120px;
+      object-fit: cover;
+      border-radius: 4px;
+      display: block;
+    }
+    .photo-caption { font-size: 7.5pt; color: #64748b; margin-top: 2px; }
+    .footer-sign {
+      margin-top: 25px;
+      display: flex;
+      justify-content: space-between;
+      page-break-inside: avoid;
+    }
+    .sign-box { width: 45%; text-align: center; font-size: 9.5pt; }
+    .sign-space { height: 60px; }
+    @media print {
+      .no-print { display: none !important; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="margin-bottom: 15px; background: #e0f2fe; border: 1px solid #7dd3fc; padding: 10px 14px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center;">
+    <span style="font-size: 9pt; color: #0369a1; font-weight: bold;">Dokumen Siap Cetak / Simpan PDF (DERMAGA GIZI)</span>
+    <div>
+      <button onclick="window.print()" style="background: #0284c7; color: #ffffff; border: none; padding: 7px 16px; border-radius: 6px; font-weight: bold; font-size: 9pt; cursor: pointer;">Cetak Dokumen / Simpan PDF</button>
+    </div>
+  </div>
+
+  <div class="kop-header">
+    <h2>PEMERINTAH PROVINSI DAERAH KHUSUS IBUKOTA JAKARTA</h2>
+    <h2>DINAS KESEHATAN</h2>
+    <h1>PUSKESMAS KECAMATAN KEPULAUAN SERIBU SELATAN</h1>
+    <p>Jl. Dermaga Utama, Kelurahan Pulau Tidung, Kepulauan Seribu Selatan, DKI Jakarta 14520</p>
+    <p>Sistem Informasi DERMAGA GIZI - Akselerasi Penanganan Gizi Balita Lintas Sektor</p>
+  </div>
+
+  <div class="doc-title">
+    <h3>LEMBAR HISTORI & REKAM JEJAK TINDAK LANJUT GIZI BALITA</h3>
+    <span>NO DOKUMEN: ${tl.tindak_lanjut_id} · TANGGAL CETAK: ${tanggalCetak}</span>
+  </div>
+
+  <div class="section-title">1. Profil & Identitas Sasaran Balita</div>
+  <table class="profile">
+    <tr>
+      <td style="width: 20%;"><strong>Kode Sasaran</strong></td>
+      <td style="width: 30%;">: <strong>${kodeSasaran}</strong></td>
+      <td style="width: 20%;"><strong>Wilayah / Pulau</strong></td>
+      <td style="width: 30%;">: ${namaPulau}</td>
+    </tr>
+    <tr>
+      <td><strong>Inisial / Nama</strong></td>
+      <td>: ${namaInisial} (${jenisKelamin})</td>
+      <td><strong>Posyandu / Kel.</strong></td>
+      <td>: ${posyanduNama} / ${kelurahanNama}</td>
+    </tr>
+    <tr>
+      <td><strong>NIK Balita</strong></td>
+      <td>: ${nik}</td>
+      <td><strong>Nama Orang Tua</strong></td>
+      <td>: ${namaOrtu}</td>
+    </tr>
+    <tr>
+      <td><strong>Tanggal Lahir</strong></td>
+      <td>: ${tglLahir} (${usia})</td>
+      <td><strong>Nomor Kontak / WA</strong></td>
+      <td>: ${noHp}</td>
+    </tr>
+    <tr>
+      <td><strong>Status Gizi Terakhir</strong></td>
+      <td>: <span class="badge ${isNormal ? 'badge-success' : 'badge-danger'}">${statusGizi}</span></td>
+      <td><strong>Status Intervensi</strong></td>
+      <td>: <span class="badge badge-status" style="font-size: 9pt; font-weight: 800;">${tl.status}</span></td>
+    </tr>
+  </table>
+
+  <div class="section-title">2. Hasil Pengukuran Antropometri Terakhir</div>
+  <table class="bordered">
+    <thead>
+      <tr>
+        <th>Berat Badan (BB)</th>
+        <th>Tinggi Badan (TB)</th>
+        <th>LiLA</th>
+        <th>Z-Score BB/TB</th>
+        <th>Z-Score PB/U (TB/U)</th>
+        <th>Z-Score BB/U</th>
+        <th>Tanggal Ukur</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td style="font-weight: bold; color: #0369a1;">${bb}</td>
+        <td style="font-weight: bold; color: #0369a1;">${tb}</td>
+        <td>${lila}</td>
+        <td>${zscoreBbtb}</td>
+        <td>${zscoreTbu}</td>
+        <td>${zscoreBbu}</td>
+        <td>${tglUkur}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="section-title">3. Rencana Intervensi Klinis Puskesmas</div>
+  <table class="bordered">
+    <tr>
+      <th style="width: 25%;">Kategori Intervensi</th>
+      <td style="width: 75%; font-weight: bold;">${tl.kategori}</td>
+    </tr>
+    <tr>
+      <th>Rencana Tindak Lanjut</th>
+      <td>${tl.rencana_intervensi}</td>
+    </tr>
+    <tr>
+      <th>Petugas Penanggung Jawab</th>
+      <td>${pj?.nama || 'Petugas Gizi'} (${pj?.unit || 'Puskesmas Kepulauan Seribu Selatan'})</td>
+    </tr>
+    <tr>
+      <th>Jadwal & Batas Waktu</th>
+      <td>Tanggal Rencana: ${tl.tanggal_rencana} | Batas Tenggat: <strong>${tl.tenggat}</strong></td>
+    </tr>
+    ${catatanRows}
+    ${kendalaRows}
+  </table>
+
+  ${klinisFotoHtml}
+
+  <div class="section-title">4. Histori & Riwayat Aksi Kolaborasi Lintas Sektor</div>
+  ${aksiRowsHtml}
+
+  <div class="footer-sign">
+    <div class="sign-box">
+      <p>Mengetahui,<br />Penanggung Jawab Lintas Sektor / Kelurahan</p>
+      <div class="sign-space"></div>
+      <p><strong>( .................................................... )</strong><br />NIP. ..............................................</p>
+    </div>
+    <div class="sign-box">
+      <p>Kepulauan Seribu Selatan, ${tanggalCetak}<br />Petugas Nutrisionis / Tenaga Gizi</p>
+      <div class="sign-space"></div>
+      <p><strong>( ${pj?.nama || currentUser.nama || 'Petugas Gizi'} )</strong><br />Unit: ${pj?.unit || currentUser.unit || 'Puskesmas Kepulauan Seribu Selatan'}</p>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 500);
+    };
+  </script>
+</body>
+</html>`;
+
+    // Render using print iframe to reliably support in-browser PDF printing and iframe environments
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 3000);
+      }, 500);
+    }
   };
 
   const handleSaveModal = async (e: React.FormEvent) => {
@@ -518,6 +941,34 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'Lulus Intervensi':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
+            <Award className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+            <span>Lulus Intervensi</span>
+          </span>
+        );
+      case 'Lulus Usia':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-cyan-100 text-cyan-800 dark:bg-cyan-950 dark:text-cyan-300 border border-cyan-300 dark:border-cyan-800">
+            <Clock className="w-3 h-3 text-cyan-600 dark:text-cyan-400" />
+            <span>Lulus Usia (&gt;59 Bln)</span>
+          </span>
+        );
+      case 'Pindah Domisili':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-purple-100 text-purple-800 dark:bg-purple-950 dark:text-purple-300 border border-purple-300 dark:border-purple-800">
+            <Truck className="w-3 h-3 text-purple-600 dark:text-purple-400" />
+            <span>Pindah Domisili</span>
+          </span>
+        );
+      case 'Meninggal':
+        return (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[11px] font-bold rounded-full bg-slate-200 text-slate-800 dark:bg-slate-800 dark:text-slate-300 border border-slate-300 dark:border-slate-700">
+            <HeartCrack className="w-3 h-3 text-rose-500" />
+            <span>Meninggal</span>
+          </span>
+        );
       case 'Selesai':
         return <span className="px-2.5 py-0.5 text-[11px] font-semibold rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300">Selesai</span>;
       case 'Dalam proses':
@@ -739,14 +1190,18 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
 
       </div>
 
-      {/* 3. Status Tabs (Presisi Lampiran 2 #3) */}
-      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold pb-1">
+      {/* 3. Status Tabs */}
+      <div className="flex items-center gap-1 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold pb-1 overflow-x-auto">
         {[
-          { id: 'ALL', label: 'Semua (72)' },
-          { id: 'Terjadwal', label: 'Terjadwal' },
+          { id: 'ALL', label: `Semua (${rawTindakLanjutList.length})` },
           { id: 'Dalam proses', label: 'Dalam proses' },
-          { id: 'Selesai', label: 'Selesai' },
-          { id: 'Terlambat', label: 'Terlambat (19)' }
+          { id: 'Selesai', label: 'Selesai / Lulus' },
+          { id: 'Lulus Intervensi', label: 'Lulus Intervensi' },
+          { id: 'Lulus Usia', label: 'Lulus Usia' },
+          { id: 'Pindah Domisili', label: 'Pindah Domisili' },
+          { id: 'Meninggal', label: 'Meninggal' },
+          { id: 'Terlambat', label: 'Terlambat' },
+          { id: 'Terjadwal', label: 'Terjadwal' }
         ].map(tab => (
           <button
             key={tab.id}
@@ -968,6 +1423,17 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                             <span>Tindak Lanjut Lintas Sektor</span>
                           </button>
 
+                          {/* AKSI: Status Intervensi (Lulus Intervensi, Lulus Usia, Pindah Domisili, Meninggal) */}
+                          <button
+                            type="button"
+                            onClick={() => handleOpenStatusModal(tl)}
+                            className="px-2 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shadow-2xs transition-all cursor-pointer"
+                            title="Aksi Status Intervensi: Lulus Intervensi, Lulus Usia, Pindah Domisili, Meninggal"
+                          >
+                            <Award className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                            <span>Status Intervensi</span>
+                          </button>
+
                           {/* Tombol Catat / Kelola Kendala */}
                           <button
                             type="button"
@@ -997,9 +1463,17 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                             type="button"
                             onClick={() => handleOpenDetail(tl)}
                             className="p-1.5 text-sky-600 dark:text-sky-400 hover:text-sky-800 hover:bg-sky-50 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
-                            title="Lihat Rincian Pasien & Hasil Intervensi Seluruh Lintas Sektor"
+                            title="Lihat Histori Rincian & Cetak PDF Dokumen Lengkap"
                           >
                             <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handlePrintHistoryPDF(tl)}
+                            className="p-1.5 text-slate-600 dark:text-slate-400 hover:text-sky-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                            title="Cetak PDF Rekam Jejak Tindak Lanjut"
+                          >
+                            <Printer className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
@@ -1176,7 +1650,7 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                   >
                     {allUsers.map(u => (
                       <option key={u.user_id} value={u.user_id}>
-                        {u.nama} ({u.role.replace(/_/g, ' ')})
+                        {u.nama} ({String(u.role || '').replace(/_/g, ' ')})
                       </option>
                     ))}
                   </select>
@@ -1205,6 +1679,10 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                     <option value="Selesai" disabled={!isHealthcareWorker}>
                       Selesai {!isHealthcareWorker ? '(Wewenang Petugas Kesehatan)' : ''}
                     </option>
+                    <option value="Lulus Intervensi">Lulus Intervensi (Sembuh / Gizi Baik)</option>
+                    <option value="Lulus Usia">Lulus Usia (&gt;59 Bulan)</option>
+                    <option value="Pindah Domisili">Pindah Domisili (Keluar Wilayah)</option>
+                    <option value="Meninggal">Meninggal</option>
                     <option value="Belum ditindaklanjuti">Belum ditindaklanjuti (Terlambat)</option>
                     <option value="Menunggu koordinasi">Menunggu koordinasi (Terjadwal)</option>
                   </select>
@@ -1748,7 +2226,7 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
               </div>
               <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                 {waBroadcastAksiModal.notifications.map((notif, nIdx) => {
-                  const phone = notif.penerima_wa.replace(/\D/g, '') || '6281299887711';
+                  const phone = String(notif.penerima_wa || '').replace(/\D/g, '') || '6281299887711';
                   const waUrl = notif.link_wa || `https://wa.me/${phone}?text=${encodeURIComponent(notif.pesan)}`;
 
                   return (
@@ -1851,13 +2329,24 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                   </div>
                 </div>
 
-                <button 
-                  type="button"
-                  onClick={() => setDetailPasienTL(null)}
-                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                <div className="flex items-center gap-2">
+                  <button 
+                    type="button"
+                    onClick={() => handlePrintHistoryPDF(detailPasienTL)}
+                    className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                    title="Cetak PDF Rekam Jejak Tindak Lanjut Beserta Gambar & Foto Bukti"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Cetak PDF</span>
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setDetailPasienTL(null)}
+                    className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
               </div>
 
               {/* 1. KARTU INFORMASI PASIEN BALITA */}
@@ -2157,6 +2646,16 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
+                    onClick={() => handlePrintHistoryPDF(detailPasienTL)}
+                    className="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-xs transition-colors"
+                    title="Cetak PDF Rekam Jejak Tindak Lanjut Termasuk Foto Dokumentasi"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>Cetak PDF (Termasuk Foto)</span>
+                  </button>
+
+                  <button
+                    type="button"
                     onClick={() => {
                       const s = sasaran;
                       const p = pulau;
@@ -2436,6 +2935,168 @@ export const TindakLanjutView: React.FC<TindakLanjutViewProps> = ({
                   </button>
                 </div>
 
+              </form>
+
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL AKSI STATUS INTERVENSI (Lulus Intervensi, Lulus Usia, Pindah Domisili, Meninggal) */}
+      {statusIntervensiModal.isOpen && statusIntervensiModal.tl && (() => {
+        const tl = statusIntervensiModal.tl;
+        const sasaran = allSasaran.find(s => s.sasaran_id === tl.sasaran_id);
+        const pulau = pulauList.find(p => p.pulau_id === sasaran?.pulau_id);
+
+        const statusOptions: Array<{
+          value: StatusTindakLanjut;
+          label: string;
+          desc: string;
+          icon: React.ReactNode;
+          badgeClass: string;
+        }> = [
+          {
+            value: 'Lulus Intervensi',
+            label: 'Lulus Intervensi (Sembuh / Gizi Baik)',
+            desc: 'Balita berhasil ditangani, berat/tinggi badan membaik dan telah mencapai status gizi normal/baik.',
+            icon: <Award className="w-5 h-5 text-emerald-600" />,
+            badgeClass: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-900 dark:text-emerald-200'
+          },
+          {
+            value: 'Lulus Usia',
+            label: 'Lulus Usia (>59 Bulan / >5 Tahun)',
+            desc: 'Balita telah melampaui usia 59 bulan dan resmi lulus dari sasaran pemantauan balita posyandu.',
+            icon: <Clock className="w-5 h-5 text-cyan-600" />,
+            badgeClass: 'border-cyan-500 bg-cyan-50 dark:bg-cyan-950/40 text-cyan-900 dark:text-cyan-200'
+          },
+          {
+            value: 'Pindah Domisili',
+            label: 'Pindah Domisili (Keluar Wilayah)',
+            desc: 'Keluarga balita telah pindah domisili/tempat tinggal ke luar wilayah kerja Kepulauan Seribu Selatan.',
+            icon: <Truck className="w-5 h-5 text-purple-600" />,
+            badgeClass: 'border-purple-500 bg-purple-50 dark:bg-purple-950/40 text-purple-900 dark:text-purple-200'
+          },
+          {
+            value: 'Meninggal',
+            label: 'Meninggal Dunia',
+            desc: 'Balita tercatat telah berpulang / meninggal dunia.',
+            icon: <HeartCrack className="w-5 h-5 text-rose-600" />,
+            badgeClass: 'border-rose-500 bg-rose-50 dark:bg-rose-950/40 text-rose-900 dark:text-rose-200'
+          },
+          {
+            value: 'Dalam proses',
+            label: 'Dalam Proses Intervensi',
+            desc: 'Intervensi dan pendampingan lintas sektor masih aktif berjalan di lapangan.',
+            icon: <Clock className="w-5 h-5 text-amber-600" />,
+            badgeClass: 'border-amber-500 bg-amber-50 dark:bg-amber-950/40 text-amber-900 dark:text-amber-200'
+          },
+          {
+            value: 'Selesai',
+            label: 'Selesai (Intervensi Tuntas)',
+            desc: 'Rencana intervensi klinis telah tuntas dilaksanakan.',
+            icon: <CheckCircle2 className="w-5 h-5 text-blue-600" />,
+            badgeClass: 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-900 dark:text-blue-200'
+          }
+        ];
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in duration-200">
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-xl w-full p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto text-xs">
+              
+              {/* Header */}
+              <div className="flex items-start justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-2.5 rounded-2xl bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                    <Award className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-slate-900 dark:text-white text-base">
+                      Ubah Status Intervensi
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                      {sasaran?.kode_sasaran || tl.sasaran_id} ({sasaran?.inisial || 'An. Balita'}) · {pulau?.nama_pulau || 'Kepulauan Seribu Selatan'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStatusIntervensiModal({ isOpen: false, tl: null, status: 'Dalam proses', catatan: '' })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveStatusModal} className="space-y-4">
+                <div>
+                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1.5">
+                    Pilih Status Intervensi Sasaran Balita:
+                  </label>
+                  <div className="space-y-2">
+                    {statusOptions.map(opt => {
+                      const isSelected = statusIntervensiModal.status === opt.value;
+                      return (
+                        <div
+                          key={opt.value}
+                          onClick={() => setStatusIntervensiModal(prev => ({ ...prev, status: opt.value }))}
+                          className={`p-3 rounded-2xl border transition-all cursor-pointer flex items-start gap-3 ${
+                            isSelected 
+                              ? `${opt.badgeClass} ring-2 ring-indigo-500/30 font-semibold shadow-xs` 
+                              : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/60 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="status_intervensi_choice"
+                            checked={isSelected}
+                            onChange={() => setStatusIntervensiModal(prev => ({ ...prev, status: opt.value }))}
+                            className="mt-1 cursor-pointer accent-indigo-600"
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              {opt.icon}
+                              <span className="font-bold text-xs">{opt.label}</span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+                              {opt.desc}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block font-bold text-slate-800 dark:text-slate-200 mb-1">
+                    Catatan / Alasan Perubahan Status (Opsional):
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={statusIntervensiModal.catatan}
+                    onChange={e => setStatusIntervensiModal(prev => ({ ...prev, catatan: e.target.value }))}
+                    placeholder="Contoh: Balita telah ditimbang ulang dengan hasil BB 11.2 kg (Gizi Baik), atau surat keterangan pindah domisili ke Jakarta Utara..."
+                    className="w-full p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-indigo-500 text-slate-800 dark:text-slate-200"
+                  />
+                </div>
+
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStatusIntervensiModal({ isOpen: false, tl: null, status: 'Dalam proses', catatan: '' })}
+                    className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-xl font-semibold hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-sky-600 hover:from-indigo-700 hover:to-sky-700 text-white rounded-xl font-bold flex items-center gap-1.5 shadow-xs cursor-pointer"
+                  >
+                    <Save className="w-4 h-4" />
+                    <span>Simpan Status Intervensi</span>
+                  </button>
+                </div>
               </form>
 
             </div>

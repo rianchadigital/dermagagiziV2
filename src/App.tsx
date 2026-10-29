@@ -177,6 +177,13 @@ export default function App() {
       }
     }
     handleRefreshData();
+    // Sinkronisasi data dari spreadsheet saat login
+    setIsSyncing(true);
+    apiService.fetchDatabaseData()
+      .then(changed => {
+        if (changed) handleRefreshData();
+      })
+      .finally(() => setIsSyncing(false));
   };
 
   const handleLogout = () => {
@@ -250,7 +257,7 @@ export default function App() {
         {/* Viewport Content */}
         <main className="flex-1 p-4 md:p-6 max-w-7xl w-full mx-auto">
           <ErrorBoundary
-            key={activeTab}
+            key={`${activeTab}-${refreshKey}`}
             fallbackTitle={`Terjadi Kendala Memuat Modul ${activeTab}`}
             onReset={() => setActiveTab('dashboard')}
           >

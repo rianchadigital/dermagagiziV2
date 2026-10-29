@@ -45,115 +45,76 @@ export const MapView: React.FC<MapViewProps> = ({
 
   const selectedPulau = pulauList.find(p => p.pulau_id === selectedPulauId) || pulauList[0];
 
-  // Specific metrics for selected island matching mockup Image 2 #2
-  const islandMetricsMap: { [id: string]: {
-    sasaran: number;
-    perluTL: number;
-    selesai: number;
-    tertunda: number;
-    statusAkses: string;
-    statusColor: string;
-    giziBreakdown: { name: string; count: number }[];
-    kendalaBreakdown: { name: string; count: number }[];
-  } } = {
-    'PULAU-01': {
-      sasaran: 180,
-      perluTL: 28,
-      selesai: 14,
-      tertunda: 6,
-      statusAkses: 'Lancar',
-      statusColor: 'bg-emerald-500 text-emerald-700',
-      giziBreakdown: [
-        { name: 'Gizi kurang', count: 12 },
-        { name: 'Berat badan tidak naik', count: 8 },
-        { name: 'Risiko pertumbuhan', count: 5 },
-        { name: 'Gizi lebih', count: 2 },
-        { name: 'Lainnya', count: 1 }
-      ],
-      kendalaBreakdown: [
-        { name: 'Transportasi', count: 3 },
-        { name: 'Cuaca', count: 1 },
-        { name: 'Ketidakhadiran', count: 1 },
-        { name: 'Perubahan jadwal', count: 0 },
-        { name: 'Lainnya', count: 1 }
-      ]
-    },
-    'PULAU-02': {
-      sasaran: 150,
-      perluTL: 24,
-      selesai: 10,
-      tertunda: 8,
-      statusAkses: 'Lancar',
-      statusColor: 'bg-emerald-500 text-emerald-700',
-      giziBreakdown: [
-        { name: 'Gizi kurang', count: 14 },
-        { name: 'Berat badan tidak naik', count: 5 },
-        { name: 'Risiko pertumbuhan', count: 3 },
-        { name: 'Gizi lebih', count: 1 },
-        { name: 'Lainnya', count: 1 }
-      ],
-      kendalaBreakdown: [
-        { name: 'Transportasi', count: 4 },
-        { name: 'Cuaca', count: 2 },
-        { name: 'Ketidakhadiran', count: 1 },
-        { name: 'Perubahan jadwal', count: 1 },
-        { name: 'Lainnya', count: 0 }
-      ]
-    },
-    'PULAU-03': {
-      sasaran: 100,
-      perluTL: 14,
-      selesai: 7,
-      tertunda: 6,
-      statusAkses: 'Perlu koordinasi',
-      statusColor: 'bg-amber-500 text-amber-700',
-      giziBreakdown: [
-        { name: 'Gizi kurang', count: 7 },
-        { name: 'Berat badan tidak naik', count: 4 },
-        { name: 'Risiko pertumbuhan', count: 2 },
-        { name: 'Gizi lebih', count: 1 },
-        { name: 'Lainnya', count: 0 }
-      ],
-      kendalaBreakdown: [
-        { name: 'Transportasi', count: 2 },
-        { name: 'Cuaca', count: 3 },
-        { name: 'Ketidakhadiran', count: 1 },
-        { name: 'Perubahan jadwal', count: 0 },
-        { name: 'Lainnya', count: 0 }
-      ]
-    },
-    'PULAU-04': {
-      sasaran: 50,
-      perluTL: 6,
-      selesai: 4,
-      tertunda: 2,
-      statusAkses: 'Lancar',
-      statusColor: 'bg-emerald-500 text-emerald-700',
-      giziBreakdown: [
-        { name: 'Gizi kurang', count: 3 },
-        { name: 'Berat badan tidak naik', count: 2 },
-        { name: 'Risiko pertumbuhan', count: 1 },
-        { name: 'Gizi lebih', count: 0 },
-        { name: 'Lainnya', count: 0 }
-      ],
-      kendalaBreakdown: [
-        { name: 'Transportasi', count: 1 },
-        { name: 'Cuaca', count: 0 },
-        { name: 'Ketidakhadiran', count: 0 },
-        { name: 'Perubahan jadwal', count: 1 },
-        { name: 'Lainnya', count: 0 }
-      ]
-    }
-  };
+  const allKendala = storageService.getKendalaList(selectedPulau.pulau_id);
 
-  const currentMetrics = islandMetricsMap[selectedPulau.pulau_id] || islandMetricsMap['PULAU-01'];
-
-  // Sasaran and TL on this island
+  // Sasaran and TL on this island (Data riil dari database Google Spreadsheet)
   const sasaranPulauList = allSasaran.filter(s => s.pulau_id === selectedPulau.pulau_id);
   const tlPulauList = allTL.filter(t => {
     const s = allSasaran.find(item => item.sasaran_id === t.sasaran_id);
     return s && s.pulau_id === selectedPulau.pulau_id;
   });
+
+  const totalSasaranCount = sasaranPulauList.length;
+  const perluTLCount = tlPulauList.filter(t => !['Selesai', 'Lulus Intervensi', 'Lulus Usia', 'Pindah Domisili', 'Meninggal'].includes(t.status)).length;
+  const selesaiCount = tlPulauList.filter(t => ['Selesai', 'Lulus Intervensi', 'Lulus Usia'].includes(t.status)).length;
+  const tertundaCount = tlPulauList.filter(t => t.status === 'Belum ditindaklanjuti').length;
+
+  // Breakdown masalah gizi riil dari database
+  const giziKurangCount = sasaranPulauList.filter(s => {
+    const k = (s.kategori_masalah_terakhir || '').toLowerCase();
+    return k.includes('kurang') || k.includes('wasting');
+  }).length;
+
+  const bbTidakNaikCount = sasaranPulauList.filter(s => {
+    const k = (s.kategori_masalah_terakhir || '').toLowerCase();
+    return k.includes('underweight') || k.includes('bb kurang') || s.naik_berat_badan === 'T';
+  }).length;
+
+  const stuntingCount = sasaranPulauList.filter(s => {
+    const k = (s.kategori_masalah_terakhir || '').toLowerCase();
+    return k.includes('stunting') || k.includes('pendek');
+  }).length;
+
+  const giziLebihCount = sasaranPulauList.filter(s => {
+    const k = (s.kategori_masalah_terakhir || '').toLowerCase();
+    return k.includes('lebih') || k.includes('obesitas') || k.includes('overweight');
+  }).length;
+
+  const giziLainnyaCount = Math.max(0, totalSasaranCount - (giziKurangCount + bbTidakNaikCount + stuntingCount + giziLebihCount));
+
+  const giziBreakdown = [
+    { name: 'Gizi kurang (Wasting)', count: giziKurangCount },
+    { name: 'Berat badan tidak naik (Underweight)', count: bbTidakNaikCount },
+    { name: 'Risiko pertumbuhan (Stunting)', count: stuntingCount },
+    { name: 'Gizi lebih / Obesitas', count: giziLebihCount },
+    { name: 'Lainnya / Normal', count: giziLainnyaCount }
+  ];
+
+  // Breakdown kendala riil dari database
+  const kendalaTransport = allKendala.filter(k => k.kategori === 'Transportasi').length;
+  const kendalaEkonomi = allKendala.filter(k => k.kategori === 'Ekonomi').length;
+  const kendalaPenolakan = allKendala.filter(k => k.kategori === 'Penolakan').length;
+  const kendalaPengetahuan = allKendala.filter(k => k.kategori === 'Kurang Pengetahuan').length;
+  const kendalaLain = allKendala.filter(k => !['Transportasi', 'Ekonomi', 'Penolakan', 'Kurang Pengetahuan'].includes(k.kategori)).length;
+
+  const kendalaBreakdown = [
+    { name: 'Transportasi Laut', count: kendalaTransport },
+    { name: 'Ekonomi Keluarga', count: kendalaEkonomi },
+    { name: 'Penolakan Keluarga', count: kendalaPenolakan },
+    { name: 'Kurang Pengetahuan', count: kendalaPengetahuan },
+    { name: 'Lainnya', count: kendalaLain }
+  ];
+
+  const currentMetrics = {
+    sasaran: totalSasaranCount,
+    perluTL: perluTLCount,
+    selesai: selesaiCount,
+    tertunda: tertundaCount,
+    statusAkses: selectedPulau.status_akses || 'Mudah',
+    statusColor: selectedPulau.status_akses === 'Mudah' ? 'bg-emerald-500 text-emerald-700' : 'bg-amber-500 text-amber-700',
+    giziBreakdown,
+    kendalaBreakdown
+  };
 
   return (
     <div className="space-y-4">

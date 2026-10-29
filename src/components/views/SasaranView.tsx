@@ -28,7 +28,8 @@ import {
   Check,
   Phone,
   User as UserIcon,
-  HelpCircle
+  HelpCircle,
+  RefreshCw
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { GlobalFilter, Pulau, SasaranBalita, User, KategoriMasalahGizi } from '../../types';
@@ -78,6 +79,8 @@ export const SasaranView: React.FC<SasaranViewProps> = ({
   const [importError, setImportError] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importSuccessMsg, setImportSuccessMsg] = useState('');
+  const [isPullingData, setIsPullingData] = useState(false);
+  const [pullToast, setPullToast] = useState<string | null>(null);
 
   const [waAlertModal, setWaAlertModal] = useState<{
     isOpen: boolean;
@@ -298,8 +301,8 @@ export const SasaranView: React.FC<SasaranViewProps> = ({
       `• No HP: ${s.no_hp || s.no_wa_ortu || '-'}\n\n` +
       `Akses sistem DERMAGA GIZI: ${storageService.getAppUrl()}`;
 
-    const phone = s.no_wa_ortu || s.no_hp || '';
-    if (phone) {
+    const phone = String(s.no_wa_ortu || s.no_hp || '');
+    if (phone && phone.replace(/\D/g, '')) {
       window.open(`https://wa.me/${phone.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`, '_blank');
     } else {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
@@ -593,6 +596,22 @@ export const SasaranView: React.FC<SasaranViewProps> = ({
     }
   };
 
+  const handlePullFromSpreadsheet = async () => {
+    setIsPullingData(true);
+    try {
+      await apiService.fetchDatabaseData();
+      onRefreshData();
+      const currentCount = storageService.getSasaranList().length;
+      setPullToast(`Berhasil menarik data dari Google Spreadsheet! ${currentCount} data sasaran balita termuat.`);
+      setTimeout(() => setPullToast(null), 4000);
+    } catch (err: any) {
+      setPullToast('Gagal menarik data dari Google Spreadsheet: ' + (err.message || 'Koneksi error'));
+      setTimeout(() => setPullToast(null), 4000);
+    } finally {
+      setIsPullingData(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       
@@ -620,6 +639,18 @@ export const SasaranView: React.FC<SasaranViewProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Tombol Tarik Data dari Spreadsheet */}
+          <button
+            type="button"
+            disabled={isPullingData}
+            onClick={handlePullFromSpreadsheet}
+            className="px-3.5 py-2 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs disabled:opacity-60"
+            title="Tarik pembaruan data balita terbaru langsung dari Google Spreadsheet"
+          >
+            <RefreshCw className={`w-4 h-4 text-sky-600 ${isPullingData ? 'animate-spin' : ''}`} />
+            <span>{isPullingData ? 'Menarik Data...' : 'Tarik Data dari Spreadsheet'}</span>
+          </button>
+
           {/* Tombol Unduh Template Excel e-PPGBM */}
           <button
             type="button"

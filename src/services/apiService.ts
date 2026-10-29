@@ -441,6 +441,21 @@ class ApiService {
     return user;
   }
 
+  public async deleteUser(userId: string): Promise<boolean> {
+    const success = storageService.deleteUser(userId);
+    await this.postToGas('deleteUser', { user_id: userId });
+    return success;
+  }
+
+  public async resetUserPassword(userId: string, newPassword?: string): Promise<boolean> {
+    const success = storageService.resetUserPassword(userId, newPassword);
+    const targetUser = storageService.getUsers().find(u => u.user_id === userId);
+    if (targetUser) {
+      await this.postToGas('updateUser', targetUser);
+    }
+    return success;
+  }
+
   // ==========================================
   // --- LAPORAN POSYANDU ---
   // ==========================================

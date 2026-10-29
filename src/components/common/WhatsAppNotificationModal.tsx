@@ -143,7 +143,7 @@ export const WhatsAppNotificationModal: React.FC<WhatsAppNotificationModalProps>
                           ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300' 
                           : 'bg-sky-100 text-sky-700 dark:bg-sky-900/50 dark:text-sky-300'
                       }`}>
-                        {n.kategori.replace(/_/g, ' ')}
+                        {String(n.kategori || '').replace(/_/g, ' ')}
                       </span>
                       <span className="font-semibold text-slate-800 dark:text-slate-200">{n.judul}</span>
                     </div>
@@ -157,7 +157,7 @@ export const WhatsAppNotificationModal: React.FC<WhatsAppNotificationModalProps>
                   <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between text-[11px]">
                     <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                       <User className="w-3.5 h-3.5" />
-                      <span>Ke: <b>{n.penerima_nama}</b> ({n.penerima_role.replace(/_/g, ' ')})</span>
+                      <span>Ke: <b>{n.penerima_nama}</b> ({String(n.penerima_role || '').replace(/_/g, ' ')})</span>
                       <span>·</span>
                       <span className="font-mono">{n.penerima_wa}</span>
                     </div>

@@ -654,78 +654,6 @@ export const LaporanView: React.FC<LaporanViewProps> = ({
             </div>
 
           </div>
-
-          {/* Table Rekapitulasi Evaluasi Kelurahan */}
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-xs overflow-hidden">
-            <div className="p-4 md:p-5 border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 flex items-center justify-between">
-              <h3 className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                Tabel Matriks Rekapitulasi Evaluasi 3 Kelurahan
-              </h3>
-              <button
-                onClick={handleExportKelurahanCSV}
-                className="px-3 py-1.5 bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-300 hover:bg-sky-100 rounded-lg text-xs font-semibold flex items-center gap-1 border border-sky-200 dark:border-sky-800"
-              >
-                <Download className="w-3.5 h-3.5" />
-                <span>Unduh Rekap Kelurahan</span>
-              </button>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 border-b border-slate-200 dark:border-slate-800 font-semibold">
-                  <tr>
-                    <th className="py-3 px-4">Nama Kelurahan</th>
-                    <th className="py-3 px-4 text-center">Posyandu</th>
-                    <th className="py-3 px-4 text-center">Sasaran (S)</th>
-                    <th className="py-3 px-4 text-center">Ditimbang (D)</th>
-                    <th className="py-3 px-4 text-center">Tidak Hadir (T)</th>
-                    <th className="py-3 px-4 text-center">Cakupan (D/S)</th>
-                    <th className="py-3 px-4 text-center">Gizi Kurang</th>
-                    <th className="py-3 px-4 text-center">Gizi Buruk</th>
-                    <th className="py-3 px-4 text-center">Stunting</th>
-                    <th className="py-3 px-4 text-center">Underweight</th>
-                    <th className="py-3 px-4 text-center">Total Masalah</th>
-                    <th className="py-3 px-4 text-center">TL Selesai</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800 text-slate-700 dark:text-slate-300">
-                  {evaluasiKelurahanData.map((k) => (
-                    <tr key={k.kelurahan_id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/40 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-slate-900 dark:text-slate-100">
-                        {k.nama_kelurahan}
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-mono">{k.total_posyandu} Pos</td>
-                      <td className="py-3.5 px-4 text-center font-mono">{k.total_sasaran}</td>
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-sky-600">{k.total_ditimbang}</td>
-                      <td className="py-3.5 px-4 text-center font-mono text-amber-600">{k.total_tidak_hadir}</td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className={`px-2 py-0.5 rounded-full font-bold text-[11px] ${
-                          k.persentase_d_s >= 80 
-                            ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' 
-                            : 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300'
-                        }`}>
-                          {k.persentase_d_s}%
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-mono text-amber-700 font-semibold">{k.gizi_kurang}</td>
-                      <td className="py-3.5 px-4 text-center font-mono text-rose-700 font-bold">{k.gizi_buruk}</td>
-                      <td className="py-3.5 px-4 text-center font-mono text-purple-700 font-semibold">{k.stunting}</td>
-                      <td className="py-3.5 px-4 text-center font-mono text-blue-700">{k.underweight}</td>
-                      <td className="py-3.5 px-4 text-center">
-                        <span className="px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 font-bold font-mono">
-                          {k.total_masalah_gizi} Anak
-                        </span>
-                      </td>
-                      <td className="py-3.5 px-4 text-center font-mono font-bold text-emerald-600">
-                        {k.persentase_tl_selesai}%
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
         </div>
       )}
 
@@ -842,7 +770,7 @@ export const LaporanView: React.FC<LaporanViewProps> = ({
                         <td className="py-3 px-4">
                           <div className="font-medium text-slate-800 dark:text-slate-200">{p.ketua_kader}</div>
                           <a
-                            href={`https://wa.me/${p.no_wa_kader.replace(/\D/g, '')}?text=Halo%20${encodeURIComponent(p.ketua_kader)}%20(${encodeURIComponent(p.nama_posyandu)}),%20koordinasi%20evaluasi%20penimbangan%20gizi.`}
+                            href={`https://wa.me/${String(p.no_wa_kader || '').replace(/\D/g, '')}?text=Halo%20${encodeURIComponent(p.ketua_kader)}%20(${encodeURIComponent(p.nama_posyandu)}),%20koordinasi%20evaluasi%20penimbangan%20gizi.`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-[10px] text-emerald-600 dark:text-emerald-400 hover:underline flex items-center gap-1 font-mono"

@@ -18,6 +18,7 @@ export interface User {
   email: string;
   nama: string;
   no_wa?: string; // Nomor WhatsApp aktif (format: 628...)
+  password?: string; // Kata sandi akun
   role: Role;
   unit: string;
   pulau_id: string;
@@ -146,8 +147,13 @@ export type StatusTindakLanjut =
   | 'Dalam proses'
   | 'Menunggu koordinasi'
   | 'Selesai'
+  | 'Lulus Intervensi'
+  | 'Lulus Usia'
+  | 'Pindah Domisili'
+  | 'Meninggal'
   | 'Perlu evaluasi ulang'
-  | 'Dibatalkan';
+  | 'Dibatalkan'
+  | string;
 
 export type Prioritas = 'Tinggi' | 'Sedang' | 'Rendah';
 
